@@ -1,0 +1,6 @@
+{
+  "name": "Painel Operacional OPs",
+  "description": "Painel web completo para controle operacional de OPs (Ordens de Produção).",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
