@@ -1,5 +1,9 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
+<<<<<<< HEAD
 import { supabase, fetchOPs, updateOPStatus, updateOPStatusByOP } from './lib/supabase';
+=======
+import { supabase, fetchOPs, updateOPStatus } from './lib/supabase';
+>>>>>>> 38d7ae392d5bbeb25a97bfad3dd1138fd49de920
 import type { Session } from '@supabase/supabase-js';
 import { OPRecord, OPFilters, OPStatus } from './types';
 import Cards from './components/Cards';
@@ -116,6 +120,7 @@ export default function App() {
   const handleUpdateStatus = async (id: number, status: OPStatus) => {
     if (!isSupabaseConfigured) return;
 
+<<<<<<< HEAD
     const registroSelecionado = ops.find((op) => op.id === id);
 
     setIsUpdating(id);
@@ -125,6 +130,10 @@ export default function App() {
         return;
       }
 
+=======
+    setIsUpdating(id);
+    try {
+>>>>>>> 38d7ae392d5bbeb25a97bfad3dd1138fd49de920
       await updateOPStatus(id, status, usuarioAtual);
     } catch (e) {
       alert('Erro ao atualizar OP');

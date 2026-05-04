@@ -72,6 +72,7 @@ export async function updateOPStatus(
   return data;
 }
 
+<<<<<<< HEAD
 
 export async function updateOPStatusByOP(
   op: string,
@@ -111,6 +112,8 @@ export async function updateOPStatusByOP(
   return data;
 }
 
+=======
+>>>>>>> 38d7ae392d5bbeb25a97bfad3dd1138fd49de920
 function gerarChaveSync(op: Partial<OPRecord>): string {
   return [
     String(op.op || '').trim(),
