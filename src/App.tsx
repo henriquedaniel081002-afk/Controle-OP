@@ -116,7 +116,6 @@ export default function App() {
   const handleUpdateStatus = async (id: number, status: OPStatus) => {
     if (!isSupabaseConfigured) return;
 
-<<<<<<< HEAD
     const registroSelecionado = ops.find((op) => op.id === id);
 
     setIsUpdating(id);
@@ -126,10 +125,6 @@ export default function App() {
         return;
       }
 
-=======
-    setIsUpdating(id);
-    try {
->>>>>>> 38d7ae392d5bbeb25a97bfad3dd1138fd49de920
       await updateOPStatus(id, status, usuarioAtual);
     } catch (e) {
       alert('Erro ao atualizar OP');
