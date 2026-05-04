@@ -1,9 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-<<<<<<< HEAD
 import { supabase, fetchOPs, updateOPStatus, updateOPStatusByOP } from './lib/supabase';
-=======
-import { supabase, fetchOPs, updateOPStatus } from './lib/supabase';
->>>>>>> 38d7ae392d5bbeb25a97bfad3dd1138fd49de920
 import type { Session } from '@supabase/supabase-js';
 import { OPRecord, OPFilters, OPStatus } from './types';
 import Cards from './components/Cards';
