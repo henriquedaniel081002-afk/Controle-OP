@@ -18,6 +18,7 @@ export default function App() {
   const [isUpdating, setIsUpdating] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [quickSearch, setQuickSearch] = useState('');
 
   const isSupabaseConfigured = !!supabase;
   const usuarioAtual = session?.user?.email || 'Usuário';
@@ -102,6 +103,23 @@ export default function App() {
       if (filters.linha && !String(op.linha || '').toLowerCase().includes(filters.linha.toLowerCase())) return false;
       if (filters.setor && !String(op.setor || '').toLowerCase().includes(filters.setor.toLowerCase())) return false;
       if (filters.status && op.status !== filters.status) return false;
+
+      if (quickSearch) {
+        const search = quickSearch.toLowerCase();
+        const searchableFields = [
+          op.op,
+          op.codigo_produto,
+          op.potencia,
+          op.linha,
+          op.cliente,
+          op.setor,
+          op.qtde,
+          op.data_programada
+        ].join(' ').toLowerCase();
+
+        if (!searchableFields.includes(search)) return false;
+      }
+
       if (filters.dataInicial || filters.dataFinal) {
         if (!op.data_programada) return false;
 
@@ -111,7 +129,7 @@ export default function App() {
       }
       return true;
     });
-  }, [ops, filters]);
+  }, [ops, filters, quickSearch]);
 
   const handleUpdateStatus = async (id: number, status: OPStatus) => {
     if (!isSupabaseConfigured) return;
@@ -128,6 +146,47 @@ export default function App() {
       await updateOPStatus(id, status, usuarioAtual);
     } catch (e) {
       alert('Erro ao atualizar OP');
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+
+  const handleBulkStatus = async (type: 'impresso' | 'pendente_impressao' | 'recolhido') => {
+    if (!isSupabaseConfigured || filteredOps.length === 0) return;
+
+    try {
+      setIsUpdating(-1);
+
+      if (type === 'impresso' || type === 'pendente_impressao') {
+        const uniqueOps = [...new Set(filteredOps.map(item => item.op).filter(Boolean))];
+
+        for (const op of uniqueOps) {
+          await updateOPStatusByOP(op, type, usuarioAtual);
+        }
+      } else {
+        for (const item of filteredOps) {
+          await updateOPStatus(item.id, 'recolhido', usuarioAtual);
+        }
+      }
+    } catch (e) {
+      alert('Erro ao atualizar registros em massa');
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  const handleBulkUndoRecolhido = async () => {
+    if (!isSupabaseConfigured || filteredOps.length === 0) return;
+
+    try {
+      setIsUpdating(-1);
+
+      for (const item of filteredOps) {
+        await updateOPStatus(item.id, 'impresso', usuarioAtual);
+      }
+    } catch (e) {
+      alert('Erro ao remover recolhimento em massa');
     } finally {
       setIsUpdating(null);
     }
@@ -205,17 +264,57 @@ export default function App() {
           recolhidas={recolhidas}
         />
 
-        <div className="flex justify-end mb-4 bg-white/5 p-3 rounded-lg border border-white/10">
-          <button 
-            onClick={() => setIsFiltersOpen(true)}
-            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded text-sm font-medium transition-all relative whitespace-nowrap"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-            Filtros Avançados
-            {Object.values(filters).filter(Boolean).length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-[#00EE76] rounded-full ring-2 ring-[#0a0a0a]"></span>
-            )}
-          </button>
+        <div className="mb-4 bg-white/5 p-3 rounded-lg border border-white/10 space-y-3">
+          <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+            <input
+              type="text"
+              value={quickSearch}
+              onChange={(e) => setQuickSearch(e.target.value)}
+              placeholder="Buscar OP, produto, potência, linha, cliente..."
+              className="w-full lg:max-w-xl bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-[#00EE76]"
+            />
+
+            <button 
+              onClick={() => setIsFiltersOpen(true)}
+              className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded text-sm font-medium transition-all relative whitespace-nowrap"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+              Filtros Avançados
+              {Object.values(filters).filter(Boolean).length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-[#00EE76] rounded-full ring-2 ring-[#0a0a0a]"></span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleBulkStatus('impresso')}
+              className="bg-[#00EE76]/10 hover:bg-[#00EE76]/20 border border-[#00EE76]/20 text-[#00EE76] px-3 py-2 rounded text-xs font-semibold"
+            >
+              Marcar todos como impressos
+            </button>
+
+            <button
+              onClick={() => handleBulkStatus('pendente_impressao')}
+              className="bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 text-yellow-300 px-3 py-2 rounded text-xs font-semibold"
+            >
+              Desmarcar todos impressos
+            </button>
+
+            <button
+              onClick={() => handleBulkStatus('recolhido')}
+              className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-300 px-3 py-2 rounded text-xs font-semibold"
+            >
+              Marcar todos recolhidos
+            </button>
+
+            <button
+              onClick={handleBulkUndoRecolhido}
+              className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-3 py-2 rounded text-xs font-semibold"
+            >
+              Desmarcar todos recolhidos
+            </button>
+          </div>
         </div>
 
         {loading ? (
