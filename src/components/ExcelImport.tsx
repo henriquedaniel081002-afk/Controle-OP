@@ -4,16 +4,65 @@ import * as XLSX from 'xlsx';
 import { syncOPsWithExcel } from '../lib/supabase';
 import { OPRecord } from '../types';
 
-const EXPECTED_COLUMNS = [
-  'OP-Pai',
-  'Dt.Programada',
-  'Referência Prod.',
-  'Potência PA',
-  'Linha Prod',
-  'Nome Cliente',
-  'Qtd.Programada',
-  'Descr.Atividade'
+type ColumnKey =
+  | 'op'
+  | 'dataProgramada'
+  | 'codigoProduto'
+  | 'potencia'
+  | 'linha'
+  | 'cliente'
+  | 'qtde'
+  | 'setor'
+  | 'serieInicial'
+  | 'serieFinal';
+
+const COLUMN_DEFINITIONS: { key: ColumnKey; label: string; aliases: string[] }[] = [
+  { key: 'op', label: 'OP-Pai', aliases: ['OP-Pai', 'OP Pai', 'OP'] },
+  { key: 'dataProgramada', label: 'Dt.Programada', aliases: ['Dt.Programada', 'Dt Programada', 'Data Programada'] },
+  { key: 'codigoProduto', label: 'Referência Prod.', aliases: ['Referência Prod.', 'Referencia Prod.', 'Referência Produto', 'Referencia Produto'] },
+  { key: 'potencia', label: 'Potência PA', aliases: ['Potência PA', 'Potencia PA'] },
+  { key: 'linha', label: 'Linha Prod', aliases: ['Linha Prod', 'Linha Produto'] },
+  { key: 'cliente', label: 'Nome Cliente', aliases: ['Nome Cliente', 'Cliente'] },
+  { key: 'qtde', label: 'Qtd.Programada', aliases: ['Qtd.Programada', 'Qtd Programada', 'Quantidade Programada'] },
+  { key: 'setor', label: 'Descr.Atividade', aliases: ['Descr.Atividade', 'Descr Atividade', 'Descrição Atividade', 'Descricao Atividade'] },
+  { key: 'serieInicial', label: 'Série Inicial', aliases: ['Série Inicial', 'Serie Inicial'] },
+  { key: 'serieFinal', label: 'Série Final', aliases: ['Série Final', 'Serie Final'] }
 ];
+
+function normalizarTexto(valor: string): string {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[.\-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function resolverColunas(columns: string[]): { resolved: Record<ColumnKey, string>; missing: string[] } {
+  const normalizedMap = new Map<string, string>();
+
+  for (const col of columns) {
+    normalizedMap.set(normalizarTexto(col), col);
+  }
+
+  const resolved = {} as Record<ColumnKey, string>;
+  const missing: string[] = [];
+
+  for (const definition of COLUMN_DEFINITIONS) {
+    const found = definition.aliases
+      .map(alias => normalizedMap.get(normalizarTexto(alias)))
+      .find(Boolean);
+
+    if (found) {
+      resolved[definition.key] = found;
+    } else {
+      missing.push(definition.label);
+    }
+  }
+
+  return { resolved, missing };
+}
 
 function limpar(valor: unknown): string {
   if (valor === undefined || valor === null) return '';
@@ -29,6 +78,34 @@ function numero(valor: unknown): number {
     .trim();
 
   return Number(texto) || 0;
+}
+
+function numeroOuNull(valor: unknown): number | null {
+  if (valor === undefined || valor === null || valor === '') return null;
+  const valorNumerico = numero(valor);
+  return Number.isFinite(valorNumerico) && valorNumerico !== 0 ? valorNumerico : null;
+}
+
+function textoSerie(valor: unknown): string {
+  const texto = limpar(valor);
+  if (!texto) return '';
+
+  const numeroSerie = numeroOuNull(valor);
+  if (numeroSerie !== null) {
+    return String(numeroSerie);
+  }
+
+  return texto;
+}
+
+function montarSerie(inicial: unknown, final: unknown): string | null {
+  const serieInicial = textoSerie(inicial);
+  const serieFinal = textoSerie(final);
+
+  if (serieInicial && serieFinal) return `${serieInicial} - ${serieFinal}`;
+  if (serieInicial) return serieInicial;
+  if (serieFinal) return serieFinal;
+  return null;
 }
 
 function doisDigitos(valor: number): string {
@@ -101,39 +178,68 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array', cellDates: true });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+      const rawRows: unknown[][] = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
 
-      if (!rows.length) {
+      if (!rawRows.length) {
         alert('Arquivo vazio ou sem dados para importar.');
         return;
       }
 
-      const columns = Object.keys(rows[0] || {});
-      const missingColumns = EXPECTED_COLUMNS.filter(col => !columns.includes(col));
+      const headerRowIndex = rawRows.findIndex(row => {
+        const columnsCandidate = row.map(col => limpar(col));
+        return resolverColunas(columnsCandidate).missing.length === 0;
+      });
 
-      if (missingColumns.length > 0) {
+      if (headerRowIndex === -1) {
+        const expectedColumns = COLUMN_DEFINITIONS.map(column => column.label).join('\n');
         alert(
-          `As seguintes colunas não foram encontradas no arquivo:\n\n${missingColumns.join('\n')}\n\nVerifique se o Excel exportado está no padrão correto.`
+          `Não encontrei a linha de cabeçalho do Excel.\n\nColunas esperadas:\n${expectedColumns}\n\nVerifique se o arquivo exportado está no padrão correto.`
         );
         return;
       }
 
+      const columns = rawRows[headerRowIndex].map(col => limpar(col));
+      const { resolved, missing } = resolverColunas(columns);
+
+      if (missing.length > 0) {
+        alert(
+          `As seguintes colunas não foram encontradas no arquivo:\n\n${missing.join('\n')}\n\nVerifique se o Excel exportado está no padrão correto.`
+        );
+        return;
+      }
+
+      const rows: Record<string, unknown>[] = rawRows
+        .slice(headerRowIndex + 1)
+        .map(row => {
+          const item: Record<string, unknown> = {};
+          columns.forEach((column, index) => {
+            if (column) item[column] = row[index] ?? '';
+          });
+          return item;
+        });
+
       const opsToInsert: Partial<OPRecord>[] = rows
         .map(item => {
           const linha = {
-            op: limpar(item['OP-Pai']),
-            data_programada: dataParaISO(item['Dt.Programada']),
-            codigo_produto: limpar(item['Referência Prod.']),
-            potencia: limpar(item['Potência PA']),
-            linha: limpar(item['Linha Prod']),
-            cliente: limpar(item['Nome Cliente']),
-            qtde: numero(item['Qtd.Programada']),
-            setor: limpar(item['Descr.Atividade'])
+            op: limpar(item[resolved.op]),
+            data_programada: dataParaISO(item[resolved.dataProgramada]),
+            codigo_produto: limpar(item[resolved.codigoProduto]),
+            potencia: limpar(item[resolved.potencia]),
+            linha: limpar(item[resolved.linha]),
+            cliente: limpar(item[resolved.cliente]),
+            qtde: numero(item[resolved.qtde]),
+            setor: limpar(item[resolved.setor]),
+            serie_inicial: numeroOuNull(item[resolved.serieInicial]),
+            serie_final: numeroOuNull(item[resolved.serieFinal]),
+            serie: montarSerie(item[resolved.serieInicial], item[resolved.serieFinal])
           };
 
           return {
             ...linha,
             status: 'pendente_impressao' as const,
+            marcado: false,
+            data_marcacao: null,
+            usuario_marcacao: null,
             chave_importacao: gerarChave(linha)
           };
         })
@@ -148,7 +254,7 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
       onImportComplete();
 
       alert(
-        `Importação concluída.\n\nLinhas lidas no Excel: ${rows.length}\nLinhas válidas no Excel: ${opsToInsert.length}\nNovos registros incluídos: ${resultado.inserted.length}\nRegistros removidos do painel: ${resultado.deletedCount}\nRegistros iguais foram mantidos.`
+        `Importação concluída.\n\nLinhas lidas no Excel: ${rows.length}\nLinhas válidas no Excel: ${opsToInsert.length}\nRegistros únicos sincronizados: ${resultado.validUniqueCount}\nNovos registros incluídos: ${resultado.insertedCount}\nRegistros existentes atualizados/preservados: ${resultado.updatedCount}\nRegistros removidos do painel: ${resultado.deletedCount}\n\nAs marcações existentes foram preservadas.`
       );
     } catch (err) {
       console.error(err);

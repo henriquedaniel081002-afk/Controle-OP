@@ -1,4 +1,5 @@
 export type OPStatus = 'pendente_impressao' | 'impresso' | 'recolhido';
+export type MarcacaoFiltro = 'todos' | 'pendentes' | 'marcados';
 
 export interface OPRecord {
   id: number;
@@ -10,8 +11,17 @@ export interface OPRecord {
   cliente: string;
   qtde: number;
   setor: string;
-  status: OPStatus;
+  status: OPStatus | null;
   chave_importacao?: string;
+
+  serie_inicial: number | null;
+  serie_final: number | null;
+  serie: string | null;
+
+  marcado: boolean | null;
+  data_marcacao: string | null;
+  usuario_marcacao: string | null;
+
   data_impressao: string | null;
   usuario_impressao: string | null;
   data_recolhimento: string | null;
