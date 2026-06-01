@@ -186,27 +186,62 @@ export async function updateOPStatusByOP(
 }
 
 function gerarChaveSync(op: Partial<OPRecord>): string {
-  return [
-    String(op.op || '').trim(),
-    String(op.data_programada || '').trim(),
-    Number(op.qtde || 0),
-    String(op.setor || '').trim()
-  ].join('|');
+  return String(op.op || '').trim();
 }
 
+function compararDataProgramada(a?: string | null, b?: string | null): number {
+  const dataA = String(a || '9999-12-31');
+  const dataB = String(b || '9999-12-31');
+  return dataA.localeCompare(dataB);
+}
+
+function consolidarRegistrosExcelPorOP(opsFromExcel: Partial<OPRecord>[]) {
+  const excelByOP = new Map<string, Partial<OPRecord>>();
+
+  for (const opExcel of opsFromExcel) {
+    const chaveOP = gerarChaveSync(opExcel);
+    if (!chaveOP) continue;
+
+    const existente = excelByOP.get(chaveOP);
+
+    if (!existente) {
+      excelByOP.set(chaveOP, { ...opExcel, op: chaveOP });
+      continue;
+    }
+
+    const usarLinhaAtualComoBase = compararDataProgramada(opExcel.data_programada, existente.data_programada) < 0;
+    const base = usarLinhaAtualComoBase ? opExcel : existente;
+    const complemento = usarLinhaAtualComoBase ? existente : opExcel;
+
+    const serieInicialValores = [existente.serie_inicial, opExcel.serie_inicial]
+      .filter((valor): valor is number => typeof valor === 'number' && Number.isFinite(valor));
+    const serieFinalValores = [existente.serie_final, opExcel.serie_final]
+      .filter((valor): valor is number => typeof valor === 'number' && Number.isFinite(valor));
+
+    const serieInicial = serieInicialValores.length ? Math.min(...serieInicialValores) : (base.serie_inicial ?? complemento.serie_inicial ?? null);
+    const serieFinal = serieFinalValores.length ? Math.max(...serieFinalValores) : (base.serie_final ?? complemento.serie_final ?? null);
+
+    excelByOP.set(chaveOP, {
+      ...complemento,
+      ...base,
+      op: chaveOP,
+      qtde: Number(existente.qtde || 0) + Number(opExcel.qtde || 0),
+      serie_inicial: serieInicial,
+      serie_final: serieFinal,
+      serie: serieInicial !== null && serieFinal !== null
+        ? (serieInicial === serieFinal ? String(serieInicial) : `${serieInicial} - ${serieFinal}`)
+        : (base.serie || complemento.serie || null)
+    });
+  }
+
+  return excelByOP;
+}
 export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
   if (!supabase) throw new Error('Supabase not configured');
 
-  const excelByKey = new Map<string, Partial<OPRecord>>();
-  for (const op of opsFromExcel) {
-    const chave = gerarChaveSync(op);
-    if (!excelByKey.has(chave)) {
-      excelByKey.set(chave, op);
-    }
-  }
-
-  const opsNormalizadas = Array.from(excelByKey.values());
-  const excelKeys = new Set(opsNormalizadas.map(gerarChaveSync));
+  const excelByOP = consolidarRegistrosExcelPorOP(opsFromExcel);
+  const opsNormalizadas = Array.from(excelByOP.values());
+  const excelOPs = new Set(excelByOP.keys());
 
   const { data: currentRecords, error: fetchError } = await supabase
     .from('registro_op')
@@ -218,34 +253,57 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
   }
 
   const registrosAtuais = (currentRecords || []) as OPRecord[];
-  const currentByKey = new Map<string, OPRecord>();
+  const currentByOP = new Map<string, OPRecord[]>();
 
   for (const record of registrosAtuais) {
-    currentByKey.set(gerarChaveSync(record), record);
+    const chaveOP = gerarChaveSync(record);
+    if (!chaveOP) continue;
+
+    const registrosDaOP = currentByOP.get(chaveOP) || [];
+    registrosDaOP.push(record);
+    currentByOP.set(chaveOP, registrosDaOP);
   }
 
   const idsToDelete = registrosAtuais
-    .filter(record => !excelKeys.has(gerarChaveSync(record)))
+    .filter(record => !excelOPs.has(gerarChaveSync(record)))
     .map(record => record.id);
 
-  if (idsToDelete.length > 0) {
+  const duplicateIdsToDelete: number[] = [];
+  for (const registrosDaOP of currentByOP.values()) {
+    if (registrosDaOP.length <= 1) continue;
+
+    const [registroPreservado, ...duplicados] = [...registrosDaOP].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+    void registroPreservado;
+    duplicateIdsToDelete.push(...duplicados.map(record => record.id));
+  }
+
+  const idsParaRemover = Array.from(new Set([...idsToDelete, ...duplicateIdsToDelete]));
+
+  if (idsParaRemover.length > 0) {
     const { error: deleteError } = await supabase
       .from('registro_op')
       .delete()
-      .in('id', idsToDelete);
+      .in('id', idsParaRemover);
 
     if (deleteError) {
-      console.error('Error deleting OPs not present in Excel:', deleteError);
+      console.error('Error deleting OPs not present in Excel or duplicate OP rows:', deleteError);
       throw deleteError;
     }
   }
 
-  const recordsToUpsert = opsNormalizadas.map(opExcel => {
-    const registroAtual = currentByKey.get(gerarChaveSync(opExcel));
+  let insertedCount = 0;
+  let updatedCount = 0;
+  const syncedRecords: OPRecord[] = [];
+
+  for (const opExcel of opsNormalizadas) {
+    const chaveOP = gerarChaveSync(opExcel);
+    const registrosAtuaisDaOP = currentByOP.get(chaveOP) || [];
+    const registroAtual = [...registrosAtuaisDaOP].sort((a, b) => Number(a.id || 0) - Number(b.id || 0))[0];
     const marcacao = obterMarcacaoPreservada(registroAtual);
 
-    return {
+    const payload = {
       ...opExcel,
+      op: chaveOP,
       status: registroAtual?.status || (marcacao.marcado ? 'recolhido' : 'pendente_impressao'),
       marcado: marcacao.marcado,
       data_marcacao: marcacao.data_marcacao,
@@ -255,30 +313,47 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
       data_recolhimento: registroAtual?.data_recolhimento || null,
       usuario_recolhimento: registroAtual?.usuario_recolhimento || null
     };
-  });
 
-  const insertedCount = recordsToUpsert.filter(record => !currentByKey.has(gerarChaveSync(record))).length;
-  const updatedCount = recordsToUpsert.length - insertedCount;
+    if (registroAtual?.id) {
+      const { data: updated, error: updateError } = await supabase
+        .from('registro_op')
+        .update(payload)
+        .eq('id', registroAtual.id)
+        .select()
+        .single();
 
-  const { data: upsertedRecords, error: upsertError } = await supabase
-    .from('registro_op')
-    .upsert(recordsToUpsert, {
-      onConflict: 'op,qtde,data_programada,setor',
-      ignoreDuplicates: false
-    })
-    .select();
+      if (updateError) {
+        console.error(`Error updating OP ${chaveOP}:`, updateError);
+        throw updateError;
+      }
 
-  if (upsertError) {
-    console.error('Error syncing OPs:', upsertError);
-    throw upsertError;
+      updatedCount += 1;
+      if (updated) syncedRecords.push(updated as OPRecord);
+      continue;
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('registro_op')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error(`Error inserting OP ${chaveOP}:`, insertError);
+      throw insertError;
+    }
+
+    insertedCount += 1;
+    if (inserted) syncedRecords.push(inserted as OPRecord);
   }
 
   return {
-    inserted: upsertedRecords || [],
+    inserted: syncedRecords,
     insertedCount,
     updatedCount,
-    deletedCount: idsToDelete.length,
+    deletedCount: idsParaRemover.length,
     excelCount: opsFromExcel.length,
     validUniqueCount: opsNormalizadas.length
   };
 }
+
