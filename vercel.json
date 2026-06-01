@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install --include=dev --no-audit --no-fund --legacy-peer-deps",
-  "buildCommand": "npm run build",
+  "installCommand": "corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --no-frozen-lockfile",
+  "buildCommand": "corepack enable && pnpm run build",
   "outputDirectory": "dist",
   "framework": "vite"
 }
