@@ -264,17 +264,20 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
     currentByOP.set(chaveOP, registrosDaOP);
   }
 
-  const idsToDelete = registrosAtuais
-    .filter(record => !excelOPs.has(gerarChaveSync(record)))
-    .map(record => record.id);
+  const recordsToDelete = registrosAtuais
+    .filter(record => !excelOPs.has(gerarChaveSync(record)));
+  const idsToDelete = recordsToDelete.map(record => record.id);
+  const opsRemovidas = recordsToDelete.map(record => gerarChaveSync(record)).filter(Boolean);
 
   const duplicateIdsToDelete: number[] = [];
+  const opsDuplicadasRemovidas: string[] = [];
   for (const registrosDaOP of currentByOP.values()) {
     if (registrosDaOP.length <= 1) continue;
 
     const [registroPreservado, ...duplicados] = [...registrosDaOP].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
     void registroPreservado;
     duplicateIdsToDelete.push(...duplicados.map(record => record.id));
+    opsDuplicadasRemovidas.push(...duplicados.map(record => gerarChaveSync(record)).filter(Boolean));
   }
 
   const idsParaRemover = Array.from(new Set([...idsToDelete, ...duplicateIdsToDelete]));
@@ -293,7 +296,11 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
 
   let insertedCount = 0;
   let updatedCount = 0;
+  let preservedMarkedCount = 0;
   const syncedRecords: OPRecord[] = [];
+  const opsAdicionadas: string[] = [];
+  const opsAtualizadas: string[] = [];
+  const opsMarcadasPreservadas: string[] = [];
 
   for (const opExcel of opsNormalizadas) {
     const chaveOP = gerarChaveSync(opExcel);
@@ -314,6 +321,11 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
       usuario_recolhimento: registroAtual?.usuario_recolhimento || null
     };
 
+    if (marcacao.marcado) {
+      preservedMarkedCount += 1;
+      opsMarcadasPreservadas.push(chaveOP);
+    }
+
     if (registroAtual?.id) {
       const { data: updated, error: updateError } = await supabase
         .from('registro_op')
@@ -328,6 +340,7 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
       }
 
       updatedCount += 1;
+      opsAtualizadas.push(chaveOP);
       if (updated) syncedRecords.push(updated as OPRecord);
       continue;
     }
@@ -344,6 +357,7 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
     }
 
     insertedCount += 1;
+    opsAdicionadas.push(chaveOP);
     if (inserted) syncedRecords.push(inserted as OPRecord);
   }
 
@@ -352,8 +366,16 @@ export async function syncOPsWithExcel(opsFromExcel: Partial<OPRecord>[]) {
     insertedCount,
     updatedCount,
     deletedCount: idsParaRemover.length,
+    removedFromExcelCount: idsToDelete.length,
+    duplicateRemovedCount: duplicateIdsToDelete.length,
+    preservedMarkedCount,
     excelCount: opsFromExcel.length,
-    validUniqueCount: opsNormalizadas.length
+    validUniqueCount: opsNormalizadas.length,
+    opsAdicionadas,
+    opsAtualizadas,
+    opsRemovidas: Array.from(new Set(opsRemovidas)),
+    opsDuplicadasRemovidas: Array.from(new Set(opsDuplicadasRemovidas)),
+    opsMarcadasPreservadas: Array.from(new Set(opsMarcadasPreservadas))
   };
 }
 
