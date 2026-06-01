@@ -1,6 +1,6 @@
 {
-  "installCommand": "corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --no-frozen-lockfile",
-  "buildCommand": "corepack enable && pnpm run build",
+  "installCommand": "yarn install --network-timeout 300000 --non-interactive",
+  "buildCommand": "yarn build",
   "outputDirectory": "dist",
   "framework": "vite"
 }
