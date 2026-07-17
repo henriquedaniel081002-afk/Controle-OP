@@ -5,6 +5,7 @@ import { MarcacaoFiltro, OPRecord } from './types';
 import Table from './components/Table';
 import ExcelImport from './components/ExcelImport';
 import Login from './components/Login';
+import TopMarkerCard from './components/TopMarkerCard';
 import { AlertCircle, CalendarDays, LogOut, Search, User } from 'lucide-react';
 
 function obterMesValor(data: string | null): string | null {
@@ -14,6 +15,29 @@ function obterMesValor(data: string | null): string | null {
   return texto.slice(0, 7);
 }
 
+
+function normalizarMarcado(op: OPRecord): boolean {
+  return Boolean(op.marcado) || op.status === 'impresso' || op.status === 'recolhido';
+}
+
+function obterUsuarioMarcacao(op: OPRecord): string | null {
+  if (op.usuario_marcacao) return op.usuario_marcacao;
+  if (op.status === 'recolhido') return op.usuario_recolhimento || op.usuario_impressao || null;
+  if (op.status === 'impresso') return op.usuario_impressao || op.usuario_recolhimento || null;
+  return null;
+}
+
+function obterDataMarcacao(op: OPRecord): string | null {
+  if (op.data_marcacao) return op.data_marcacao;
+  if (op.status === 'recolhido') return op.data_recolhimento || op.data_impressao || null;
+  if (op.status === 'impresso') return op.data_impressao || op.data_recolhimento || null;
+  return null;
+}
+
+function obterSemanaDoMes(data: string | null): number {
+  const dia = Number(String(data || '').slice(8, 10)) || 1;
+  return Math.max(1, Math.ceil(dia / 7));
+}
 
 function obterUltimoDiaDoMes(selectedMonth: string): number {
   const [ano, mes] = selectedMonth.split('-').map(Number);
@@ -159,6 +183,57 @@ export default function App() {
     const mesInicial = monthOptions.find(month => month.value === mesAtual)?.value || monthOptions[0].value;
     setSelectedMonth(mesInicial);
   }, [monthOptions, selectedMonth]);
+
+
+  const topMarker = useMemo(() => {
+    if (!selectedMonth) {
+      return { users: [] as string[], count: 0, periodLabel: 'Nenhum período selecionado' };
+    }
+
+    const recordsDoPeriodo = ops.filter((record) => {
+      if (String(record.data_programada || '').slice(0, 7) !== selectedMonth) return false;
+      if (selectedWeek === 'todas') return true;
+      return obterSemanaDoMes(record.data_programada) === Number(selectedWeek);
+    });
+
+    const recordsByOP = new Map<string, OPRecord[]>();
+    for (const record of recordsDoPeriodo) {
+      const op = String(record.op || '').trim();
+      if (!op) continue;
+      recordsByOP.set(op, [...(recordsByOP.get(op) || []), record]);
+    }
+
+    const counts = new Map<string, number>();
+
+    for (const records of recordsByOP.values()) {
+      if (!records.some(normalizarMarcado)) continue;
+
+      const latestMark = records
+        .map((record) => ({
+          user: obterUsuarioMarcacao(record),
+          date: obterDataMarcacao(record)
+        }))
+        .filter((mark) => mark.user)
+        .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+
+      const user = latestMark?.user?.trim();
+      if (!user) continue;
+      counts.set(user, (counts.get(user) || 0) + 1);
+    }
+
+    const highestCount = Math.max(0, ...counts.values());
+    const users = Array.from(counts.entries())
+      .filter(([, count]) => count === highestCount && highestCount > 0)
+      .map(([user]) => user)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    const monthLabel = nomeMes(selectedMonth);
+    const periodLabel = selectedWeek === 'todas'
+      ? `Resultado de ${monthLabel}`
+      : `Resultado da Semana ${selectedWeek} de ${monthLabel}`;
+
+    return { users, count: highestCount, periodLabel };
+  }, [ops, selectedMonth, selectedWeek]);
 
   const handleLogout = async () => {
     if (!supabase) return;
@@ -359,6 +434,14 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        {!loading && (
+          <TopMarkerCard
+            users={topMarker.users}
+            count={topMarker.count}
+            periodLabel={topMarker.periodLabel}
+          />
+        )}
 
         {loading ? (
           <div className="flex justify-center items-center h-64 border border-gray-800 rounded-xl bg-gray-900/50">
