@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm ci",
-  "buildCommand": "npm run build",
+  "installCommand": "yarn install --network-timeout 300000 --non-interactive",
+  "buildCommand": "yarn build",
   "outputDirectory": "dist",
   "framework": "vite"
 }
