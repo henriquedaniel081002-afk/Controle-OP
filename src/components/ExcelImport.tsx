@@ -241,33 +241,71 @@ function formatarListaOPs(ops: string[], limite = 10): string {
 
 function StatCard({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'green' | 'red' | 'blue' }) {
   const toneClass = {
-    default: 'border-white/10 bg-white/5 text-slate-100',
-    green: 'border-[#00EE76]/30 bg-[#00EE76]/10 text-[#00EE76]',
-    red: 'border-red-400/30 bg-red-500/10 text-red-300',
-    blue: 'border-sky-400/30 bg-sky-500/10 text-sky-300'
+    default: 'border-line bg-surface-raised text-ink',
+    green: 'border-emerald/35 bg-emerald/10 text-emerald',
+    red: 'border-danger/35 bg-danger/10 text-danger',
+    blue: 'border-info/35 bg-info/10 text-info'
   }[tone];
 
   return (
-    <div className={`rounded-xl border p-3 ${toneClass}`}>
-      <p className="text-[11px] uppercase tracking-wide opacity-70">{label}</p>
-      <p className="mt-1 text-xl font-bold">{value}</p>
+    <div className={`rounded-xl border p-3.5 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-70">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
 
+const STEP_STATUS_LABELS: Record<ImportStepStatus, string> = {
+  pendente: 'Pendente',
+  processando: 'Em processamento',
+  concluido: 'Concluída',
+  erro: 'Interrompida por erro'
+};
+
 export default function ExcelImport({ onImportComplete }: { onImportComplete: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [isImporting, setIsImporting] = React.useState(false);
   const [showModal, setShowModal] = React.useState(false);
   const [steps, setSteps] = React.useState<ImportStep[]>(criarEtapas());
   const [summary, setSummary] = React.useState<ImportSummary | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const progressPercent = React.useMemo(() => {
-    const concluidas = steps.filter(step => step.status === 'concluido').length;
-    const processando = steps.some(step => step.status === 'processando') ? 0.5 : 0;
-    return Math.min(100, Math.round(((concluidas + processando) / steps.length) * 100));
-  }, [steps]);
+  React.useEffect(() => {
+    if (!showModal) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      dialogRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      triggerButtonRef.current?.focus();
+    };
+  }, [showModal]);
+
+  React.useEffect(() => {
+    if (!showModal) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showModal]);
+
+  const announcedStep = steps.find((step) => step.status === 'processando' || step.status === 'erro');
+  const statusAnnouncement = announcedStep
+    ? `${announcedStep.label}: ${STEP_STATUS_LABELS[announcedStep.status]}.`
+    : errorMessage
+      ? 'Importação interrompida.'
+      : summary
+        ? 'Sincronização concluída.'
+        : isImporting
+          ? 'Importação em andamento.'
+          : 'Processamento finalizado.';
 
   const setStepStatus = (key: ImportStepKey, status: ImportStepStatus) => {
     setSteps((current) => atualizarEtapa(current, key, status));
@@ -275,6 +313,42 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
 
   const startStep = (key: ImportStepKey) => setStepStatus(key, 'processando');
   const finishStep = (key: ImportStepKey) => setStepStatus(key, 'concluido');
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (!isImporting) setShowModal(false);
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusableElements: HTMLElement[] = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      )
+    ) as HTMLElement[];
+
+    if (focusableElements.length === 0) {
+      event.preventDefault();
+      dialog.focus();
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && (document.activeElement === firstElement || document.activeElement === dialog)) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -409,72 +483,159 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
         onChange={handleFileUpload}
       />
       <button
+        ref={triggerButtonRef}
+        type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={isImporting}
-        className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded text-sm transition-all disabled:opacity-50"
+        aria-haspopup="dialog"
+        aria-expanded={showModal}
+        aria-controls="excel-import-dialog"
+        aria-busy={isImporting}
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-control bg-surface-raised px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition-colors hover:border-subtle hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-wait disabled:opacity-60"
       >
-        <Upload className="w-4 h-4" />
+        <Upload className="h-4 w-4 text-emerald" aria-hidden="true" />
         {isImporting ? 'Importando...' : 'Importar Excel'}
       </button>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0f1115] shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/10 bg-[#0f1115]/95 p-5 backdrop-blur">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-[#00EE76]/10 p-3 text-[#00EE76]">
-                  <FileSpreadsheet className="h-6 w-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/85 p-3 backdrop-blur-sm sm:p-6">
+          <div
+            id="excel-import-dialog"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="excel-import-title"
+            aria-describedby="excel-import-description"
+            aria-busy={isImporting}
+            tabIndex={-1}
+            onKeyDown={handleDialogKeyDown}
+            className="max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl overflow-y-auto rounded-2xl border border-line bg-surface text-ink shadow-dialog outline-none sm:max-h-[calc(100dvh-3rem)]"
+          >
+            <span id="excel-import-description" className="sr-only">
+              Acompanhe cada etapa da atualização das ordens de produção.
+            </span>
+            <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {statusAnnouncement}
+            </p>
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-surface/95 p-4 backdrop-blur-xl sm:p-6">
+              <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-emerald/25 bg-emerald/10 text-emerald sm:h-12 sm:w-12">
+                  <FileSpreadsheet className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Importação do Excel</h3>
-                  <p className="mt-1 text-sm text-slate-400">
-                    Acompanhe o progresso e o resumo da atualização do banco de dados.
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald">
+                    Sincronização de dados
+                  </p>
+                  <h3 id="excel-import-title" className="mt-1 text-lg font-semibold tracking-tight text-ink sm:text-xl">Importação do Excel</h3>
+                  <p className="mt-1 text-sm leading-6 text-muted">
+                    Acompanhe as etapas e o resumo da atualização do banco de dados.
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => !isImporting && setShowModal(false)}
                 disabled={isImporting}
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={isImporting ? 'Aguarde a importação terminar para fechar' : 'Fechar importação'}
+                className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald disabled:cursor-not-allowed disabled:opacity-40"
                 title={isImporting ? 'Aguarde a importação terminar' : 'Fechar'}
               >
-                <X className="h-5 w-5" />
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
 
-            <div className="space-y-5 p-5">
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Progresso geral</span>
-                  <span className="font-semibold text-[#00EE76]">{progressPercent}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-[#00EE76] transition-all duration-300"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-5">
-                {steps.map((step) => (
-                  <div key={step.key} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                    <div className="mb-2 flex items-center gap-2">
-                      {step.status === 'concluido' && <CheckCircle2 className="h-4 w-4 text-[#00EE76]" />}
-                      {step.status === 'processando' && <Loader2 className="h-4 w-4 animate-spin text-sky-300" />}
-                      {step.status === 'erro' && <AlertCircle className="h-4 w-4 text-red-300" />}
-                      {step.status === 'pendente' && <div className="h-4 w-4 rounded-full border border-white/20" />}
-                      <span className="text-xs font-semibold text-slate-100">{step.label}</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-slate-500">{step.description}</p>
+            <div className="space-y-6 p-4 sm:p-6">
+              <section aria-labelledby="import-steps-title">
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h4 id="import-steps-title" className="text-sm font-semibold text-ink">
+                      Etapas da sincronização
+                    </h4>
+                    <p className="mt-1 text-xs leading-5 text-muted">
+                      O processo começa automaticamente após a seleção do arquivo.
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <p className="text-xs font-medium text-muted">
+                    {isImporting
+                      ? 'Importação em andamento'
+                      : errorMessage
+                        ? 'Importação interrompida'
+                        : summary
+                          ? 'Sincronização concluída'
+                          : 'Processamento finalizado'}
+                  </p>
+                </div>
+
+                <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {steps.map((step, index) => {
+                    const isActive = step.status === 'processando';
+                    const isComplete = step.status === 'concluido';
+                    const hasError = step.status === 'erro';
+
+                    return (
+                      <li
+                        key={step.key}
+                        aria-current={isActive ? 'step' : undefined}
+                        className={`relative rounded-xl border p-4 ${
+                          isActive
+                            ? 'border-info/55 bg-info/10'
+                            : isComplete
+                              ? 'border-emerald/35 bg-emerald/[0.07]'
+                              : hasError
+                                ? 'border-danger/45 bg-danger/10'
+                                : 'border-line bg-surface-raised/70'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span
+                            className={`flex h-8 w-8 flex-none items-center justify-center rounded-lg border text-xs font-bold ${
+                              isActive
+                                ? 'border-info/45 bg-info/15 text-info'
+                                : isComplete
+                                  ? 'border-emerald/35 bg-emerald/15 text-emerald'
+                                  : hasError
+                                    ? 'border-danger/40 bg-danger/15 text-danger'
+                                    : 'border-line-strong bg-surface text-muted'
+                            }`}
+                            aria-hidden="true"
+                          >
+                            {isComplete && <CheckCircle2 className="h-4 w-4" />}
+                            {isActive && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {hasError && <AlertCircle className="h-4 w-4" />}
+                            {step.status === 'pendente' && index + 1}
+                          </span>
+                          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">
+                            Etapa {index + 1} de {steps.length}
+                          </span>
+                        </div>
+                        <p className="mt-4 text-sm font-semibold leading-5 text-ink">{step.label}</p>
+                        <p className="mt-1.5 text-xs leading-5 text-muted">{step.description}</p>
+                        <p
+                          className={`mt-3 text-xs font-semibold ${
+                            isActive
+                              ? 'text-info'
+                              : isComplete
+                                ? 'text-emerald'
+                                : hasError
+                                  ? 'text-danger'
+                                  : 'text-subtle'
+                          }`}
+                        >
+                          {STEP_STATUS_LABELS[step.status]}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
 
               {errorMessage && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-200">
+                <div
+                  role="alert"
+                  className="rounded-xl border border-danger/35 bg-danger/10 p-4 text-danger"
+                >
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                    <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" aria-hidden="true" />
                     <div>
                       <p className="font-semibold">Erro na importação</p>
                       <p className="mt-1 text-sm opacity-90">{errorMessage}</p>
@@ -484,15 +645,16 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
               )}
 
               {summary && (
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-[#00EE76]/20 bg-[#00EE76]/10 p-4 text-[#00EE76]">
+                <div className="space-y-5" role="region" aria-labelledby="import-summary-title">
+                  <h4 id="import-summary-title" className="sr-only">Resumo da importação</h4>
+                  <div className="rounded-xl border border-emerald/35 bg-emerald/10 p-4 text-emerald sm:p-5">
                     <p className="font-semibold">Importação concluída com sucesso.</p>
-                    <p className="mt-1 text-sm text-slate-300">
+                    <p className="mt-1 text-sm leading-6 text-detail">
                       O banco foi sincronizado com o Excel usando a OP como chave. Marcações existentes foram preservadas.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <StatCard label="Linhas lidas" value={summary.totalRows} />
                     <StatCard label="Linhas válidas" value={summary.validRows} />
                     <StatCard label="OPs únicas" value={summary.uniqueRecords} />
@@ -503,36 +665,37 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
                     <StatCard label="Duplicadas apagadas" value={summary.duplicateRemovedCount} tone="red" />
                   </div>
 
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                    <h4 className="mb-3 text-sm font-semibold text-slate-200">Detalhamento da sincronização</h4>
+                  <div className="rounded-xl border border-line bg-canvas/45 p-4 sm:p-5">
+                    <h4 className="mb-3 text-sm font-semibold text-ink">Detalhamento da sincronização</h4>
                     <div className="grid gap-3 text-sm md:grid-cols-2">
-                      <div className="rounded-lg bg-black/20 p-3">
-                        <p className="text-xs font-semibold uppercase text-[#00EE76]">OPs adicionadas</p>
-                        <p className="mt-1 text-slate-300">{formatarListaOPs(summary.opsAdicionadas)}</p>
+                      <div className="rounded-lg border border-line bg-surface-raised/75 p-3.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald">OPs adicionadas</p>
+                        <p className="mt-1.5 break-words leading-6 text-detail">{formatarListaOPs(summary.opsAdicionadas)}</p>
                       </div>
-                      <div className="rounded-lg bg-black/20 p-3">
-                        <p className="text-xs font-semibold uppercase text-sky-300">OPs atualizadas</p>
-                        <p className="mt-1 text-slate-300">{formatarListaOPs(summary.opsAtualizadas)}</p>
+                      <div className="rounded-lg border border-line bg-surface-raised/75 p-3.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-info">OPs atualizadas</p>
+                        <p className="mt-1.5 break-words leading-6 text-detail">{formatarListaOPs(summary.opsAtualizadas)}</p>
                       </div>
-                      <div className="rounded-lg bg-black/20 p-3">
-                        <p className="text-xs font-semibold uppercase text-red-300">OPs removidas por não estarem no Excel</p>
-                        <p className="mt-1 text-slate-300">{formatarListaOPs(summary.opsRemovidas)}</p>
+                      <div className="rounded-lg border border-line bg-surface-raised/75 p-3.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-danger">OPs removidas por não estarem no Excel</p>
+                        <p className="mt-1.5 break-words leading-6 text-detail">{formatarListaOPs(summary.opsRemovidas)}</p>
                       </div>
-                      <div className="rounded-lg bg-black/20 p-3">
-                        <p className="text-xs font-semibold uppercase text-red-300">OPs duplicadas apagadas</p>
-                        <p className="mt-1 text-slate-300">{formatarListaOPs(summary.opsDuplicadasRemovidas)}</p>
+                      <div className="rounded-lg border border-line bg-surface-raised/75 p-3.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-danger">OPs duplicadas apagadas</p>
+                        <p className="mt-1.5 break-words leading-6 text-detail">{formatarListaOPs(summary.opsDuplicadasRemovidas)}</p>
                       </div>
-                      <div className="rounded-lg bg-black/20 p-3 md:col-span-2">
-                        <p className="text-xs font-semibold uppercase text-[#00EE76]">OPs que mantiveram marcação</p>
-                        <p className="mt-1 text-slate-300">{formatarListaOPs(summary.opsMarcadasPreservadas, 20)}</p>
+                      <div className="rounded-lg border border-line bg-surface-raised/75 p-3.5 md:col-span-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald">OPs que mantiveram marcação</p>
+                        <p className="mt-1.5 break-words leading-6 text-detail">{formatarListaOPs(summary.opsMarcadasPreservadas, 20)}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex justify-end">
                     <button
+                      type="button"
                       onClick={() => setShowModal(false)}
-                      className="rounded-lg bg-[#00EE76] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#00d96a]"
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald px-5 py-2.5 text-sm font-semibold text-on-accent shadow-sm transition-colors hover:bg-emerald-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                     >
                       Fechar resumo
                     </button>

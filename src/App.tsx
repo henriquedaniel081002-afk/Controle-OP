@@ -6,7 +6,7 @@ import Table from './components/Table';
 import ExcelImport from './components/ExcelImport';
 import Login from './components/Login';
 import TopMarkerCard from './components/TopMarkerCard';
-import { AlertCircle, CalendarDays, LogOut, Search, User } from 'lucide-react';
+import { AlertCircle, CalendarDays, Factory, Loader2, LogOut, Search, User } from 'lucide-react';
 
 function obterMesValor(data: string | null): string | null {
   if (!data) return null;
@@ -299,9 +299,18 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] text-slate-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00EE76]"></div>
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-canvas px-4 text-ink">
+        <div role="status" aria-live="polite" className="flex flex-col items-center gap-4 text-center">
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald/25 bg-emerald/10 text-emerald">
+            <Factory className="h-6 w-6" aria-hidden="true" />
+            <Loader2 className="absolute -inset-1 h-16 w-16 animate-spin text-emerald/40" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-ink">Controle de OP</p>
+            <p className="mt-1 text-sm text-muted">Validando sua sessão...</p>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -310,130 +319,170 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-sans p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-canvas font-sans text-ink">
+      <a
+        href="#main-content"
+        className="sr-only z-[100] rounded-lg bg-emerald px-4 py-2 font-semibold text-on-accent focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Pular para o conteúdo
+      </a>
+
+      <header className="border-b border-line bg-surface/95 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-emerald/30 bg-emerald/10 text-emerald">
+              <Factory className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold tracking-[0.12em] text-ink uppercase">Controle de OP</p>
+              <p className="mt-0.5 text-xs text-muted">Gestão operacional de produção</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+            <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-line bg-canvas/45 px-3 text-sm text-muted">
+              <User className="h-4 w-4 flex-shrink-0 text-emerald" aria-hidden="true" />
+              <span className="truncate" title={usuarioAtual}>{usuarioAtual}</span>
+            </div>
+            <ExcelImport onImportComplete={loadData} />
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-danger/30 bg-danger/10 px-4 text-sm font-semibold text-red-200 transition-colors hover:bg-danger/20"
+              aria-label="Sair do sistema"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8">
         {!isSupabaseConfigured && (
-          <div className="mb-6 bg-orange-500/10 border border-orange-500/20 text-orange-400 p-4 rounded-xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div role="alert" className="mb-5 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-amber-100">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" aria-hidden="true" />
             <div>
-              <h4 className="font-semibold">Supabase não configurado</h4>
-              <p className="text-sm opacity-80 mt-1">
-                Configure as variáveis <code className="bg-black/30 px-1 py-0.5 rounded">VITE_SUPABASE_URL</code> e <code className="bg-black/30 px-1 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code> no seu painel para conectar ao banco de dados.
+              <h2 className="font-semibold">Supabase não configurado</h2>
+              <p className="mt-1 text-sm leading-6 text-amber-100/80">
+                Configure as variáveis <code className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-xs">VITE_SUPABASE_URL</code> e <code className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-xs">VITE_SUPABASE_ANON_KEY</code> no seu painel para conectar ao banco de dados.
               </p>
             </div>
           </div>
         )}
 
         {loadError && (
-          <div className="mb-6 bg-red-500/10 border border-red-500/20 text-red-300 p-4 rounded-xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div role="alert" className="mb-5 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-red-100">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-danger" aria-hidden="true" />
             <div>
-              <h4 className="font-semibold">Falha ao carregar dados</h4>
-              <p className="text-sm opacity-80 mt-1">{loadError}</p>
+              <h2 className="font-semibold">Falha ao carregar dados</h2>
+              <p className="mt-1 text-sm leading-6 text-red-100/80">{loadError}</p>
             </div>
           </div>
         )}
 
-        <header className="flex flex-col gap-4 mb-6 border-b border-white/10 pb-4">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-8 bg-[#00EE76] rounded-full hidden md:block"></div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Painel Operacional</h1>
-                <p className="text-xs text-slate-500 mt-1">Controle mensal por semanas e marcação única por OP</p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300">
-                <User className="w-4 h-4 text-[#00EE76]" />
-                <span className="max-w-[220px] truncate" title={usuarioAtual}>{usuarioAtual}</span>
-              </div>
-              <ExcelImport onImportComplete={loadData} />
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-4 py-2 rounded text-sm transition-all"
-              >
-                <LogOut className="w-4 h-4" />
-                Sair
-              </button>
+        <section className="mb-5" aria-labelledby="page-title">
+          <p className="text-xs font-semibold tracking-[0.16em] text-emerald uppercase">Planejamento de produção</p>
+          <h1 id="page-title" className="mt-2 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Painel operacional</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+            Consulte as ordens por mês e semana, acompanhe as marcações e encontre rapidamente cada OP.
+          </p>
+        </section>
+
+        <section aria-labelledby="controls-title" className="mb-5 rounded-2xl border border-line bg-surface p-4 shadow-panel sm:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 id="controls-title" className="text-sm font-semibold text-ink">Pesquisa e filtros</h2>
+              <p className="mt-1 text-xs text-muted">Refine a visualização das ordens de produção.</p>
             </div>
           </div>
-        </header>
 
-        <div className="mb-4 bg-white/5 p-3 rounded-lg border border-white/10">
-          <div className="grid grid-cols-1 xl:grid-cols-[220px_1fr_250px_auto] gap-3 xl:items-start">
-            <label className="flex items-center gap-2 bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300">
-              <CalendarDays className="w-4 h-4 text-[#00EE76]" />
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full bg-transparent outline-none text-slate-100 capitalize"
-              >
-                {monthOptions.length === 0 ? (
-                  <option value="">Sem meses</option>
-                ) : (
-                  monthOptions.map(month => (
-                    <option key={month.value} value={month.value} className="bg-[#111] text-slate-100 capitalize">
-                      {month.label}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(180px,0.72fr)_minmax(360px,1.7fr)_minmax(180px,0.72fr)_auto] xl:items-start">
+            <div>
+              <label htmlFor="month-filter" className="mb-2 block text-xs font-semibold tracking-wide text-muted uppercase">Mês</label>
+              <div className="flex min-h-11 items-center gap-2 rounded-xl border border-control bg-canvas/55 px-3 transition-colors focus-within:border-emerald/70">
+                <CalendarDays className="h-4 w-4 flex-shrink-0 text-emerald" aria-hidden="true" />
+                <select
+                  id="month-filter"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="min-h-11 min-w-0 flex-1 bg-transparent py-2.5 text-sm text-ink outline-none capitalize"
+                >
+                  {monthOptions.length === 0 ? (
+                    <option value="">Sem meses</option>
+                  ) : (
+                    monthOptions.map(month => (
+                      <option key={month.value} value={month.value} className="capitalize">
+                        {month.label}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </div>
 
             <div>
+              <label htmlFor="quick-search" className="mb-2 block text-xs font-semibold tracking-wide text-muted uppercase">Busca rápida</label>
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
                 <input
+                  id="quick-search"
                   type="text"
                   value={quickSearch}
                   onChange={(e) => setQuickSearch(e.target.value)}
                   placeholder="Buscar OP, série, produto, potência, linha, cliente ou setor..."
-                  className="w-full bg-[#111] border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm outline-none focus:border-[#00EE76]"
+                  className="min-h-11 w-full rounded-xl border border-control bg-canvas/55 py-2.5 pr-4 pl-10 text-sm text-ink outline-none transition-colors focus:border-emerald/70"
+                  aria-describedby="quick-search-help"
                 />
               </div>
-              <p className="mt-2 text-[11px] text-slate-500">
+              <p id="quick-search-help" className="mt-2 text-xs leading-5 text-subtle">
                 Ex.: buscar 311026 encontra a OP cuja faixa de série é 311024 - 311123.
               </p>
             </div>
 
-            <label className="flex items-center gap-2 bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300">
-              <span className="text-slate-500">Semana</span>
+            <div>
+              <label htmlFor="week-filter" className="mb-2 block text-xs font-semibold tracking-wide text-muted uppercase">Semana</label>
               <select
+                id="week-filter"
                 value={selectedWeek}
                 onChange={(e) => setSelectedWeek(e.target.value)}
-                className="w-full bg-transparent outline-none text-slate-100"
+                className="min-h-11 w-full rounded-xl border border-control bg-canvas/55 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-emerald/70"
               >
-                <option value="todas" className="bg-[#111] text-slate-100">Todas</option>
+                <option value="todas">Todas</option>
                 {weekOptions.map(week => (
-                  <option key={week} value={week} className="bg-[#111] text-slate-100">
+                  <option key={week} value={week}>
                     Semana {week}
                   </option>
                 ))}
               </select>
-            </label>
-
-            <div className="flex rounded-lg overflow-hidden border border-white/10 bg-[#111] h-[38px]">
-              {([
-                ['todos', 'Todos'],
-                ['pendentes', 'Pendentes'],
-                ['marcados', 'Marcados']
-              ] as [MarcacaoFiltro, string][]).map(([value, label]) => (
-                <button
-                  key={value}
-                  onClick={() => setMarkFilter(value)}
-                  className={`px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap ${
-                    markFilter === value
-                      ? 'bg-[#00EE76] text-black'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
             </div>
+
+            <fieldset>
+              <legend className="mb-2 block text-xs font-semibold tracking-wide text-muted uppercase">Marcação</legend>
+              <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-control bg-canvas/55 p-1">
+                {([
+                  ['todos', 'Todos'],
+                  ['pendentes', 'Pendentes'],
+                  ['marcados', 'Marcados']
+                ] as [MarcacaoFiltro, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setMarkFilter(value)}
+                    aria-pressed={markFilter === value}
+                    className={`min-h-11 rounded-lg px-3 text-xs font-semibold whitespace-nowrap transition-colors ${
+                      markFilter === value
+                        ? 'bg-emerald text-on-accent shadow-sm'
+                        : 'text-muted hover:bg-white/5 hover:text-ink'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
           </div>
-        </div>
+        </section>
 
         {!loading && (
           <TopMarkerCard
@@ -444,9 +493,20 @@ export default function App() {
         )}
 
         {loading ? (
-          <div className="flex justify-center items-center h-64 border border-gray-800 rounded-xl bg-gray-900/50">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00EE76]"></div>
-          </div>
+          <section role="status" aria-live="polite" aria-busy="true" className="overflow-hidden rounded-2xl border border-line bg-surface shadow-panel">
+            <div className="flex items-center gap-3 border-b border-line bg-surface-raised/70 px-5 py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-emerald" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-semibold text-ink">Carregando ordens</p>
+                <p className="mt-0.5 text-xs text-muted">Consultando os dados operacionais.</p>
+              </div>
+            </div>
+            <div aria-hidden="true" className="space-y-3 p-5">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-12 animate-pulse rounded-xl bg-surface-soft/80" />
+              ))}
+            </div>
+          </section>
         ) : (
           <Table
             data={ops}
@@ -458,7 +518,7 @@ export default function App() {
             updatingOP={updatingOP}
           />
         )}
-      </div>
+      </main>
     </div>
   );
 }

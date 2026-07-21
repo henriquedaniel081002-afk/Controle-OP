@@ -16,42 +16,68 @@ function displayUser(user: string): string {
 export default function TopMarkerCard({ users, count, periodLabel }: TopMarkerCardProps) {
   const hasResult = users.length > 0 && count > 0;
   const isTie = users.length > 1;
-  const title = isTie ? 'Empate na liderança' : 'Usuário com mais marcações';
+  const title = !hasResult ? 'Marcações no período' : isTie ? 'Empate na liderança' : 'Usuário com mais marcações';
   const userNames = hasResult
     ? users.map(displayUser).join(' e ')
     : 'Nenhuma marcação no período';
 
   return (
-    <section className="mb-4 overflow-hidden rounded-xl border border-[#00EE76]/20 bg-gradient-to-r from-[#00EE76]/10 via-white/[0.04] to-transparent">
-      <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-[#00EE76]/20 bg-[#00EE76]/10">
+    <section
+      className="relative mb-5 overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_18px_45px_rgba(0,0,0,0.2)]"
+      aria-label={title}
+      aria-live="polite"
+    >
+      <div
+        className={`absolute inset-y-0 left-0 w-1 ${hasResult ? 'bg-emerald' : 'bg-line-strong'}`}
+        aria-hidden="true"
+      />
+
+      <div className="flex flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex min-w-0 items-start gap-4">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${
+              hasResult
+                ? 'border-emerald/30 bg-emerald/10'
+                : 'border-line bg-surface-raised'
+            }`}
+            aria-hidden="true"
+          >
             {hasResult ? (
-              <Trophy className="h-5 w-5 text-[#00EE76]" />
+              <Trophy className="h-5 w-5 text-emerald" />
             ) : (
-              <UserRoundCheck className="h-5 w-5 text-slate-500" />
+              <UserRoundCheck className="h-5 w-5 text-subtle" />
             )}
           </div>
 
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#00EE76]">
+            <p
+              className={`text-[0.6875rem] font-semibold uppercase tracking-[0.16em] ${
+                hasResult ? 'text-emerald' : 'text-muted'
+              }`}
+            >
               {title}
             </p>
             <p
-              className={`mt-1 truncate text-lg font-bold ${hasResult ? 'text-white' : 'text-slate-400'}`}
+              className={`mt-1.5 break-words text-lg font-semibold leading-snug [overflow-wrap:anywhere] sm:text-xl ${
+                hasResult ? 'text-ink' : 'text-muted'
+              }`}
               title={hasResult ? users.join(', ') : undefined}
             >
               {userNames}
             </p>
-            <p className="mt-1 text-xs text-slate-500">{periodLabel}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">{periodLabel}</p>
           </div>
         </div>
 
-        <div className="sm:text-right">
-          <div className={`font-mono text-3xl font-bold ${hasResult ? 'text-[#00EE76]' : 'text-slate-600'}`}>
+        <div className="border-t border-line pt-4 sm:min-w-32 sm:border-l sm:border-t-0 sm:py-1 sm:pl-6 sm:text-right">
+          <div
+            className={`font-mono text-4xl font-semibold leading-none tabular-nums ${
+              hasResult ? 'text-emerald' : 'text-subtle'
+            }`}
+          >
             {count}
           </div>
-          <p className="text-[11px] uppercase tracking-wide text-slate-500">
+          <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-muted">
             {count === 1 ? 'OP marcada' : 'OPs marcadas'}
           </p>
         </div>

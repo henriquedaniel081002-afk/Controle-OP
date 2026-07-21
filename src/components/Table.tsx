@@ -306,165 +306,269 @@ export default function Table({ data, selectedMonth, quickSearch, markFilter, se
 
   if (!selectedMonth) {
     return (
-      <div className="border border-white/10 rounded-lg bg-black/20 p-10 text-center text-sm text-slate-500">
-        Nenhum mês disponível para exibição. Importe um Excel para carregar as OPs.
+      <div
+        role="status"
+        className="rounded-2xl border border-line bg-surface px-6 py-14 text-center shadow-panel"
+      >
+        <p className="text-sm font-semibold text-ink">Nenhum mês disponível</p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
+          Importe um arquivo Excel para carregar e visualizar as ordens de produção.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {semanas.map(semana => (
-        <section key={semana.week} className="border border-white/10 rounded-xl bg-black/20 overflow-hidden">
-          <div className="bg-white/[0.04] border-b border-white/10 px-4 py-3">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-bold uppercase tracking-wider text-white">Semana {semana.week}</h2>
-                  <span className="text-[11px] text-slate-500">{semana.inicio} a {semana.fim}</span>
+        <section
+          key={semana.week}
+          aria-labelledby={`semana-${semana.week}-titulo`}
+          className="overflow-hidden rounded-2xl border border-line bg-surface shadow-panel"
+        >
+          <header className="border-b border-line bg-surface-raised px-4 py-4 sm:px-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <h2
+                    id={`semana-${semana.week}-titulo`}
+                    className="text-sm font-bold uppercase tracking-[0.14em] text-ink"
+                  >
+                    Semana {semana.week}
+                  </h2>
+                  <span className="rounded-full border border-line-strong bg-canvas/60 px-2.5 py-1 text-xs font-medium text-muted">
+                    {semana.inicio} a {semana.fim}
+                  </span>
                 </div>
-                <div className="mt-1 text-[11px] text-slate-400">
-                  {semana.total} OPs · {semana.marcadas} marcadas · {semana.percentual}% concluído
+                <div className="mt-3 flex flex-wrap gap-2" aria-label={`Resumo da semana ${semana.week}`}>
+                  <span className="rounded-md border border-line-strong bg-canvas/45 px-2.5 py-1 text-xs text-muted">
+                    <strong className="font-semibold text-ink">{semana.total}</strong> OPs
+                  </span>
+                  <span className="rounded-md border border-emerald/30 bg-emerald/10 px-2.5 py-1 text-xs text-muted">
+                    <strong className="font-semibold text-emerald">{semana.marcadas}</strong> marcadas
+                  </span>
+                  <span className="rounded-md border border-info/30 bg-info/10 px-2.5 py-1 text-xs text-muted">
+                    <strong className="font-semibold text-info">{semana.percentual}%</strong> marcadas
+                  </span>
                 </div>
               </div>
 
-              <div className="min-w-[220px]">
-                <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                  <span>Progresso</span>
-                  <span>{semana.percentual}%</span>
+              <div className="w-full lg:max-w-xs">
+                <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted">
+                  <span>Progresso de marcação</span>
+                  <span className="tabular-nums text-ink">{semana.percentual}%</span>
                 </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#00EE76] rounded-full transition-all" style={{ width: `${semana.percentual}%` }} />
+                <div
+                  role="progressbar"
+                  aria-label={`Progresso de marcação da semana ${semana.week}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={semana.percentual}
+                  className="h-2 overflow-hidden rounded-full bg-canvas ring-1 ring-inset ring-line"
+                >
+                  <div
+                    className="h-full rounded-full bg-emerald transition-[width] duration-300 motion-reduce:transition-none"
+                    style={{ width: `${semana.percentual}%` }}
+                  />
                 </div>
               </div>
             </div>
-          </div>
+          </header>
 
-          <div className="w-full overflow-hidden">
-            <table className="w-full table-fixed text-left border-collapse text-[12px]">
-              <colgroup>
-                <col className="w-[6%]" />
-                <col className="w-[6%]" />
-                <col className="w-[12%]" />
-                <col className="w-[8%]" />
-                <col className="w-[9%]" />
-                <col className="w-[8%]" />
-                <col className="w-[6%]" />
-                <col className="w-[18%]" />
-                <col className="w-[7%]" />
-                <col className="w-[8%]" />
-                <col className="w-[7%]" />
-                <col className="w-[5%]" />
-              </colgroup>
-              <thead className="bg-black/30 border-b border-white/10 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-2 py-3 text-center">Marcado</th>
-                  <th className="px-2 py-3">OP</th>
-                  <th className="px-2 py-3">Série</th>
-                  <th className="px-2 py-3">Data</th>
-                  <th className="px-2 py-3">Código</th>
-                  <th className="px-2 py-3">Potência</th>
-                  <th className="px-2 py-3">Linha</th>
-                  <th className="px-2 py-3">Cliente</th>
-                  <th className="px-2 py-3 text-right">Qtd.</th>
-                  <th className="px-2 py-3">Setor</th>
-                  <th className="px-2 py-3">Marcado</th>
-                  <th className="px-2 py-3">Usuário</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {semana.rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="px-3 py-8 text-center text-slate-600 text-sm">
-                      Nenhuma OP nesta semana para o filtro atual.
-                    </td>
-                  </tr>
-                ) : (
-                  semana.rows
+          <div id={`semana-${semana.week}-registros`}>
+            <div className="hidden xl:block">
+              <div
+                className="overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label={`Tabela de ordens de produção da semana ${semana.week}`}
+              >
+                <table className="w-full min-w-[1220px] border-separate border-spacing-0 text-left text-xs text-detail">
+                  <caption className="sr-only">
+                    Ordens de produção da semana {semana.week}, de {semana.inicio} a {semana.fim}
+                  </caption>
+                  <thead className="sticky top-0 z-10 bg-canvas text-xs font-bold uppercase tracking-[0.08em] text-muted shadow-[inset_0_-1px_0_var(--color-line)]">
+                    <tr>
+                      <th scope="col" className="w-[68px] px-3 py-3 text-center">Marcação</th>
+                      <th scope="col" className="min-w-[82px] px-2.5 py-3">OP</th>
+                      <th scope="col" className="min-w-[124px] px-2.5 py-3">Série</th>
+                      <th scope="col" className="min-w-[94px] px-2.5 py-3">Data</th>
+                      <th scope="col" className="min-w-[106px] px-2.5 py-3">Código</th>
+                      <th scope="col" className="min-w-[96px] px-2.5 py-3">Potência</th>
+                      <th scope="col" className="min-w-[70px] px-2.5 py-3">Linha</th>
+                      <th scope="col" className="min-w-[150px] px-2.5 py-3">Cliente</th>
+                      <th scope="col" className="min-w-[62px] px-2.5 py-3 text-right">Qtd.</th>
+                      <th scope="col" className="min-w-[88px] px-2.5 py-3">Setor</th>
+                      <th scope="col" className="min-w-[132px] px-2.5 py-3">Data da marcação</th>
+                      <th scope="col" className="min-w-[118px] px-2.5 py-3">Usuário</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {semana.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={12} className="px-6 py-12 text-center">
+                          <div className="mx-auto max-w-md">
+                            <p className="font-semibold text-ink">Nenhuma OP nesta semana</p>
+                            <p className="mt-1 text-sm text-muted">Não há resultados para os filtros selecionados.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      semana.rows
+                        .slice(0, expandedWeeks[semana.week] ? semana.rows.length : limiteLinhasPorSemana)
+                        .map(row => {
+                        const isUpdating = updatingOP === row.op;
+
+                        return (
+                          <tr key={`${semana.week}-${row.op}`} className="group bg-surface transition-colors hover:bg-surface-raised motion-reduce:transition-none">
+                            <td className="px-3 py-2.5 text-center align-middle">
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => onToggleMarcado(row.op, !row.marcado)}
+                                aria-label={`${row.marcado ? 'Desmarcar' : 'Marcar'} OP ${row.op}`}
+                                aria-pressed={row.marcado}
+                                aria-busy={isUpdating}
+                                className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none ${
+                                  row.marcado
+                                    ? 'border-emerald/50 bg-emerald/15 text-emerald hover:bg-emerald/25'
+                                    : 'border-control bg-canvas/60 text-muted hover:border-subtle hover:text-ink'
+                                }`}
+                                title={row.marcado ? 'Desmarcar OP' : 'Marcar OP'}
+                              >
+                                {isUpdating ? <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : row.marcado ? <CheckCircle2 aria-hidden="true" className="h-5 w-5" /> : <Circle aria-hidden="true" className="h-5 w-5" />}
+                              </button>
+                              {isUpdating && <span className="sr-only" role="status">Atualizando a marcação da OP {row.op}</span>}
+                            </td>
+                            <td className="px-2.5 py-3 align-middle" title={row.op}>
+                              <div className="flex flex-col items-start gap-1.5">
+                                <span className="font-mono text-sm font-bold text-ink">{row.op}</span>
+                                <span className={`rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${
+                                  row.marcado
+                                    ? 'border-emerald/40 bg-emerald/10 text-emerald'
+                                    : 'border-warning/40 bg-warning/10 text-warning'
+                                }`}>
+                                  {row.marcado ? 'Marcada' : 'Pendente'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-2.5 py-3 align-middle" title={row.serie || ''}><div className="font-mono text-xs font-medium text-detail">{row.serie || '-'}</div></td>
+                            <td className="px-2.5 py-3 align-middle" title={formatarData(row.dataBase)}><div className="whitespace-nowrap font-mono text-xs text-detail">{formatarData(row.dataBase)}</div></td>
+                            <td className="px-2.5 py-3 align-middle" title={row.codigo_produto || ''}><div className="font-semibold text-ink">{row.codigo_produto || '-'}</div></td>
+                            <td className="px-2.5 py-3 align-middle" title={row.potencia || ''}><div className="max-w-[116px] break-words font-mono leading-5 text-detail">{row.potencia || '-'}</div></td>
+                            <td className="px-2.5 py-3 align-middle" title={row.linha || ''}><div className="text-detail">{row.linha || '-'}</div></td>
+                            <td className="px-2.5 py-3 align-middle" title={row.cliente || ''}><div className="max-w-[180px] break-words leading-5 text-detail">{row.cliente || '-'}</div></td>
+                            <td className="px-2.5 py-3 text-right align-middle" title={String(row.qtde ?? '')}><div className="font-mono text-sm font-semibold tabular-nums text-ink">{row.qtde}</div></td>
+                            <td className="px-2.5 py-3 align-middle" title={row.setor || ''}>
+                              <span className="inline-flex max-w-full break-words rounded-md border border-control bg-surface-raised px-2 py-1 text-xs font-semibold text-detail [overflow-wrap:anywhere]">{row.setor || '-'}</span>
+                            </td>
+                            <td className="px-2.5 py-3 align-middle" title={row.data_marcacao || ''}><div className="whitespace-nowrap text-xs text-detail">{row.marcado ? formatarDataHora(row.data_marcacao) : '-'}</div></td>
+                            <td className="px-2.5 py-3 align-middle" title={row.usuario_marcacao || ''}><div className="max-w-[144px] break-words text-xs text-muted [overflow-wrap:anywhere]">{row.marcado ? row.usuario_marcacao || '-' : '-'}</div></td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="xl:hidden">
+              {semana.rows.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <p className="font-semibold text-ink">Nenhuma OP nesta semana</p>
+                  <p className="mt-1 text-sm text-muted">Não há resultados para os filtros selecionados.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:gap-4">
+                  {semana.rows
                     .slice(0, expandedWeeks[semana.week] ? semana.rows.length : limiteLinhasPorSemana)
                     .map(row => {
                     const isUpdating = updatingOP === row.op;
 
                     return (
-                      <tr key={`${semana.week}-${row.op}`} className="hover:bg-white/[0.025] transition-colors">
-                        <td className="px-2 py-2 text-center align-middle">
-                          <button
-                            type="button"
-                            disabled={isUpdating}
-                            onClick={() => onToggleMarcado(row.op, !row.marcado)}
-                            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border transition-all disabled:opacity-60 ${
+                      <article
+                        key={`${semana.week}-${row.op}`}
+                        aria-labelledby={`semana-${semana.week}-op-${row.op}`}
+                        className={`max-w-full rounded-xl border p-4 shadow-lg [overflow-wrap:anywhere] ${
+                          row.marcado ? 'border-emerald/35 bg-emerald/[0.045]' : 'border-line bg-canvas/45'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
+                          <div className="min-w-0">
+                            <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold uppercase tracking-[0.08em] ${
                               row.marcado
-                                ? 'bg-[#00EE76]/15 border-[#00EE76]/40 text-[#00EE76] hover:bg-[#00EE76]/25'
-                                : 'bg-white/5 border-white/10 text-slate-500 hover:text-white hover:bg-white/10'
-                            }`}
-                            title={row.marcado ? 'Desmarcar OP' : 'Marcar OP'}
-                          >
-                            {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : row.marcado ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                          </button>
-                        </td>
-                        <td className="px-2 py-2 align-middle truncate" title={row.op}>
-                          <div className={`font-mono text-[12px] font-semibold truncate ${row.marcado ? 'text-[#00EE76]' : 'text-amber-400'}`}>{row.op}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle truncate" title={row.serie || ''}>
-                          <div className="font-mono text-[12px] text-slate-200 truncate">{row.serie || '-'}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle truncate" title={formatarData(row.dataBase)}>
-                          <div className="font-mono text-[12px] text-slate-200 truncate">{formatarData(row.dataBase)}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle truncate" title={row.codigo_produto || ''}>
-                          <div className="text-[12px] font-medium truncate">{row.codigo_produto || '-'}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle" title={row.potencia || ''}>
-                          <div className="font-mono text-[12px] text-slate-300 leading-tight line-clamp-2 break-words">{row.potencia || '-'}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle truncate" title={row.linha || ''}>
-                          <div className="text-[12px] text-slate-300 truncate">{row.linha || '-'}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle" title={row.cliente || ''}>
-                          <div className="text-[12px] text-slate-300 leading-tight line-clamp-2 break-words">{row.cliente || '-'}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle text-right truncate" title={String(row.qtde ?? '')}>
-                          <div className="font-mono text-[12px] text-slate-200">{row.qtde}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle" title={row.setor || ''}>
-                          <div className="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-300 leading-tight line-clamp-2 break-words">{row.setor || '-'}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle truncate" title={row.data_marcacao || ''}>
-                          <div className="text-[11px] text-slate-300 truncate">{row.marcado ? formatarDataHora(row.data_marcacao) : '-'}</div>
-                        </td>
-                        <td className="px-2 py-2 align-middle truncate" title={row.usuario_marcacao || ''}>
-                          <div className="text-[11px] text-slate-400 truncate">{row.marcado ? row.usuario_marcacao || '-' : '-'}</div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                                ? 'border-emerald/40 bg-emerald/10 text-emerald'
+                                : 'border-warning/40 bg-warning/10 text-warning'
+                            }`}>
+                              {row.marcado ? 'Marcada' : 'Pendente'}
+                            </span>
+                            <h3 id={`semana-${semana.week}-op-${row.op}`} className="mt-2 max-w-full break-words font-mono text-base font-bold text-ink [overflow-wrap:anywhere]" title={row.op}>OP {row.op}</h3>
+                          </div>
 
-            {semana.rows.length > limiteLinhasPorSemana && (
-              <div className="flex justify-center border-t border-white/10 bg-black/20 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => setExpandedWeeks(prev => ({ ...prev, [semana.week]: !prev[semana.week] }))}
-                  className="rounded-lg border border-[#00EE76]/40 px-4 py-2 text-xs font-semibold text-[#00EE76] transition-all hover:bg-[#00EE76]/10"
-                >
-                  {expandedWeeks[semana.week]
-                    ? 'Ver menos'
-                    : `Ver mais (${semana.rows.length - limiteLinhasPorSemana})`}
-                </button>
-              </div>
-            )}
+                          <div className="shrink-0 text-center">
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => onToggleMarcado(row.op, !row.marcado)}
+                              aria-label={`${row.marcado ? 'Desmarcar' : 'Marcar'} OP ${row.op}`}
+                              aria-pressed={row.marcado}
+                              aria-busy={isUpdating}
+                              className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none ${
+                                row.marcado
+                                  ? 'border-emerald/50 bg-emerald/15 text-emerald hover:bg-emerald/25'
+                                  : 'border-control bg-surface text-muted hover:border-subtle hover:text-ink'
+                              }`}
+                              title={row.marcado ? 'Desmarcar OP' : 'Marcar OP'}
+                            >
+                              {isUpdating ? <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : row.marcado ? <CheckCircle2 aria-hidden="true" className="h-5 w-5" /> : <Circle aria-hidden="true" className="h-5 w-5" />}
+                            </button>
+                            {isUpdating && <span className="sr-only" role="status">Atualizando a marcação da OP {row.op}</span>}
+                          </div>
+                        </div>
+
+                        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+                          <div className="col-span-2 max-w-full sm:col-span-1"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Série</dt><dd className="mt-1 max-w-full break-words font-mono font-medium text-ink">{row.serie || '-'}</dd></div>
+                          <div className="max-w-full"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Data programada</dt><dd className="mt-1 whitespace-nowrap font-mono text-detail">{formatarData(row.dataBase)}</dd></div>
+                          <div className="max-w-full"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Código</dt><dd className="mt-1 max-w-full break-words font-semibold text-ink">{row.codigo_produto || '-'}</dd></div>
+                          <div className="max-w-full"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Potência</dt><dd className="mt-1 max-w-full break-words font-mono text-detail">{row.potencia || '-'}</dd></div>
+                          <div className="max-w-full"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Linha</dt><dd className="mt-1 max-w-full break-words text-detail">{row.linha || '-'}</dd></div>
+                          <div className="col-span-2 max-w-full"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Cliente</dt><dd className="mt-1 max-w-full break-words leading-5 text-detail">{row.cliente || '-'}</dd></div>
+                          <div className="max-w-full"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Quantidade</dt><dd className="mt-1 font-mono text-base font-bold tabular-nums text-ink">{row.qtde}</dd></div>
+                          <div className="max-w-full"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Setor</dt><dd className="mt-1 max-w-full"><span className="inline-flex max-w-full whitespace-normal break-words rounded-md border border-control bg-surface-raised px-2 py-1 text-xs font-semibold text-detail [overflow-wrap:anywhere]">{row.setor || '-'}</span></dd></div>
+                          <div className="col-span-2 max-w-full border-t border-line pt-4 sm:col-span-1"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Data da marcação</dt><dd className="mt-1 max-w-full break-words text-xs text-detail">{row.marcado ? formatarDataHora(row.data_marcacao) : '-'}</dd></div>
+                          <div className="col-span-2 max-w-full border-t border-line pt-4 sm:col-span-1"><dt className="text-xs font-bold uppercase tracking-[0.08em] text-subtle">Usuário</dt><dd className="mt-1 max-w-full break-words text-xs text-muted">{row.marcado ? row.usuario_marcacao || '-' : '-'}</dd></div>
+                        </dl>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
+
+          {semana.rows.length > limiteLinhasPorSemana && (
+            <div className="flex justify-center border-t border-line bg-canvas/45 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setExpandedWeeks(prev => ({ ...prev, [semana.week]: !prev[semana.week] }))}
+                aria-expanded={Boolean(expandedWeeks[semana.week])}
+                aria-controls={`semana-${semana.week}-registros`}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald/45 bg-emerald/10 px-5 py-2 text-xs font-bold text-emerald transition-colors hover:bg-emerald/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none"
+              >
+                {expandedWeeks[semana.week]
+                  ? 'Ver menos'
+                  : `Ver mais (${semana.rows.length - limiteLinhasPorSemana})`}
+              </button>
+            </div>
+          )}
         </section>
       ))}
 
-      <div className="p-3 bg-white/5 flex items-center justify-between text-[10px] text-slate-500 border border-white/10 rounded-lg">
-        <span className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 bg-[#00EE76] rounded-full"></span> Sistema Conectado (Supabase)
-        </span>
-        <span>{totalGeral} OPs exibidas no mês selecionado</span>
-      </div>
+      <footer className="flex flex-col gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+        <span>Fonte de dados: <strong className="font-semibold text-detail">Supabase</strong></span>
+        <span><strong className="font-semibold tabular-nums text-ink">{totalGeral}</strong> OPs exibidas com os filtros selecionados</span>
+      </footer>
     </div>
   );
 }
