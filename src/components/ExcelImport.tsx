@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Upload, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { syncOPsWithExcel } from '../lib/supabase';
@@ -497,8 +498,8 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
         {isImporting ? 'Importando...' : 'Importar Excel'}
       </button>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/85 p-3 backdrop-blur-sm sm:p-6">
+      {showModal && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-canvas/85 p-3 backdrop-blur-sm sm:p-6">
           <div
             id="excel-import-dialog"
             ref={dialogRef}
@@ -704,7 +705,8 @@ export default function ExcelImport({ onImportComplete }: { onImportComplete: ()
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
