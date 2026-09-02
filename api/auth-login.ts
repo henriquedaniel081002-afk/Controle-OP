@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from './_lib/vercel-types.js';
 import { authenticateCredentials, createSessionCookie } from './_lib/auth.js';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Método não permitido.' });
   }
 
   try {
-    const email = authenticateCredentials(req.body?.email, req.body?.password);
+    const email = await authenticateCredentials(req.body?.email, req.body?.password);
     if (!email) {
       return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
     }

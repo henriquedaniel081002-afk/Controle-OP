@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { VercelRequest } from './vercel-types.js';
+import { getDb } from './db.js';
 
 const COOKIE_NAME = 'controle_op_session';
 const SESSION_DURATION_SECONDS = 60 * 60 * 12;
@@ -75,19 +76,48 @@ function sign(encodedPayload: string): string {
     .digest('base64url');
 }
 
-export function authenticateCredentials(email: unknown, password: unknown): string | null {
+async function authenticateDatabaseUser(email: string, password: string): Promise<string | null> {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT email
+      FROM usuarios
+      WHERE LOWER(email) = ${email}
+        AND ativo = TRUE
+        AND senha_hash = crypt(${password}, senha_hash)
+      LIMIT 1
+    `;
+
+    if (rows.length === 0) return null;
+    return normalizeEmail(rows[0].email);
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    // 42P01 = tabela usuarios ainda não criada; mantém compatibilidade com o login legado.
+    if (code === '42P01') return null;
+    throw error;
+  }
+}
+
+function authenticateConfiguredUser(email: string, password: string): string | null {
+  const users = getConfiguredUsers();
+  const user = users.find((candidate) => candidate.email === email);
+  if (!user) return null;
+  if (!safeEqual(user.password, password)) return null;
+  return user.email;
+}
+
+export async function authenticateCredentials(email: unknown, password: unknown): Promise<string | null> {
   const normalizedEmail = normalizeEmail(email);
   const suppliedPassword = String(password || '');
-  const users = getConfiguredUsers();
 
-  if (users.length === 0) {
-    throw new Error('Nenhum usuário de acesso foi configurado no servidor.');
-  }
+  if (!normalizedEmail || !suppliedPassword) return null;
 
-  const user = users.find((candidate) => candidate.email === normalizedEmail);
-  if (!user) return null;
-  if (!safeEqual(user.password, suppliedPassword)) return null;
-  return user.email;
+  // Usuários do Neon têm prioridade. As variáveis antigas continuam funcionando
+  // como acesso administrativo de contingência enquanto permanecerem configuradas.
+  const databaseUser = await authenticateDatabaseUser(normalizedEmail, suppliedPassword);
+  if (databaseUser) return databaseUser;
+
+  return authenticateConfiguredUser(normalizedEmail, suppliedPassword);
 }
 
 export function createSessionCookie(email: string): string {
