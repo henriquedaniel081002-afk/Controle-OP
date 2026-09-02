@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { AlertCircle, Factory, Loader2, Lock, LogIn, Mail, ShieldCheck } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { login, type AppSession } from '../lib/api';
 
 interface LoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (session: AppSession) => void;
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
@@ -14,11 +14,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!supabase) {
-      setError('Supabase não configurado. Verifique as variáveis de ambiente.');
-      return;
-    }
 
     const emailTrimmed = email.trim();
     const passwordTrimmed = password.trim();
@@ -32,27 +27,18 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: emailTrimmed,
-        password: passwordTrimmed
-      });
-
-      if (error) {
-        setError('E-mail ou senha inválidos. Verifique o usuário criado no Supabase.');
-        return;
-      }
-
-      onLoginSuccess();
+      const session = await login(emailTrimmed, passwordTrimmed);
+      onLoginSuccess(session);
     } catch (err) {
       console.error(err);
-      setError('Erro ao tentar entrar. Verifique a conexão e tente novamente.');
+      setError(err instanceof Error ? err.message : 'Erro ao tentar entrar. Verifique a conexão e tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
   const requiredFieldsError = error === 'Informe e-mail e senha para entrar.';
-  const credentialsError = error === 'E-mail ou senha inválidos. Verifique o usuário criado no Supabase.';
+  const credentialsError = error === 'E-mail ou senha inválidos.';
   const emailHasError = credentialsError || (requiredFieldsError && !email.trim());
   const passwordHasError = credentialsError || (requiredFieldsError && !password.trim());
 
@@ -103,7 +89,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 </div>
                 <p className="text-xs font-semibold tracking-[0.18em] text-emerald uppercase">Autenticação</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-ink">Acesse o painel</h2>
-                <p className="mt-2 text-sm leading-6 text-muted">Entre com o usuário criado no Supabase.</p>
+                <p className="mt-2 text-sm leading-6 text-muted">Entre com seu e-mail e senha de acesso ao sistema.</p>
               </div>
 
               {error && (

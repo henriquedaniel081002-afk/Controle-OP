@@ -566,7 +566,7 @@ export default function Table({ data, selectedMonth, quickSearch, markFilter, se
       ))}
 
       <footer className="flex flex-col gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-        <span>Fonte de dados: <strong className="font-semibold text-detail">Supabase</strong></span>
+        <span>Fonte de dados: <strong className="font-semibold text-detail">Neon PostgreSQL</strong></span>
         <span><strong className="font-semibold tabular-nums text-ink">{totalGeral}</strong> OPs exibidas com os filtros selecionados</span>
       </footer>
     </div>

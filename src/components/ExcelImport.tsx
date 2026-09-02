@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Upload, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { syncOPsWithExcel } from '../lib/supabase';
+import { syncOPsWithExcel } from '../lib/api';
 import { OPRecord } from '../types';
 
 type ColumnKey =
@@ -204,7 +204,7 @@ const STEP_LABELS: Record<ImportStepKey, { label: string; description: string }>
   },
   comparacao: {
     label: 'Comparando OPs',
-    description: 'Comparando as OPs do Excel com os registros do Supabase.'
+    description: 'Comparando as OPs do Excel com os registros do Neon.'
   },
   banco: {
     label: 'Atualizando banco de dados',

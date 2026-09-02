@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { supabase, fetchOPs, updateOPMarcadoByOP } from './lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import { fetchOPs, getSession, logout, updateOPMarcadoByOP, type AppSession } from './lib/api';
 import { MarcacaoFiltro, OPRecord } from './types';
 import Table from './components/Table';
 import ExcelImport from './components/ExcelImport';
@@ -63,17 +62,16 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [updatingOP, setUpdatingOP] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<AppSession | null>(null);
   const [quickSearch, setQuickSearch] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [markFilter, setMarkFilter] = useState<MarcacaoFiltro>('todos');
   const [selectedWeek, setSelectedWeek] = useState('todas');
 
-  const isSupabaseConfigured = !!supabase;
   const usuarioAtual = session?.user?.email || 'Usuário';
 
   const loadData = useCallback(async () => {
-    if (!isSupabaseConfigured || !session) {
+    if (!session) {
       setLoading(false);
       return;
     }
@@ -85,63 +83,46 @@ export default function App() {
       setOps(data);
     } catch (error) {
       console.error(error);
-      setLoadError('Erro ao carregar dados do Supabase. Verifique a URL, chave pública, RLS e conexão.');
+      setLoadError('Erro ao carregar dados do Neon. Verifique a DATABASE_URL e a conexão com a API.');
     } finally {
       setLoading(false);
     }
-  }, [isSupabaseConfigured, session]);
+  }, [session]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setAuthLoading(false);
-      return;
-    }
+    let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAuthLoading(false);
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      setSession(currentSession);
-      if (!currentSession) {
-        setOps([]);
-        setQuickSearch('');
-        setSelectedMonth('');
-        setMarkFilter('todos');
-        setSelectedWeek('todas');
-      }
-    });
+    getSession()
+      .then((currentSession) => {
+        if (active) setSession(currentSession);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (active) setSession(null);
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      active = false;
     };
-  }, [isSupabaseConfigured]);
+  }, []);
 
   useEffect(() => {
     if (!session) return;
 
     loadData();
 
-    if (isSupabaseConfigured) {
-      const subscription = supabase
-        .channel('registro_op_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_op' }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setOps((prev) => [payload.new as OPRecord, ...prev].sort((a, b) => b.id - a.id));
-          } else if (payload.eventType === 'UPDATE') {
-            setOps((prev) => prev.map((op) => op.id === payload.new.id ? payload.new as OPRecord : op));
-          } else if (payload.eventType === 'DELETE') {
-            setOps((prev) => prev.filter((op) => op.id !== payload.old.id));
-          }
-        })
-        .subscribe();
+    // Atualiza o painel periodicamente para refletir alterações feitas por outros usuários.
+    const interval = window.setInterval(() => {
+      fetchOPs()
+        .then(setOps)
+        .catch((error) => console.error('Falha na atualização periódica:', error));
+    }, 30000);
 
-      return () => {
-        subscription.unsubscribe();
-      };
-    }
-  }, [isSupabaseConfigured, session, loadData]);
+    return () => window.clearInterval(interval);
+  }, [session, loadData]);
 
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
@@ -236,12 +217,20 @@ export default function App() {
   }, [ops, selectedMonth, selectedWeek]);
 
   const handleLogout = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    try {
+      await logout();
+    } finally {
+      setSession(null);
+      setOps([]);
+      setQuickSearch('');
+      setSelectedMonth('');
+      setMarkFilter('todos');
+      setSelectedWeek('todas');
+    }
   };
 
   const handleToggleMarcado = async (op: string, marcado: boolean) => {
-    if (!isSupabaseConfigured || !op) return;
+    if (!session || !op) return;
 
     const agora = new Date().toISOString();
     let snapshotAnterior: OPRecord[] = [];
@@ -279,7 +268,7 @@ export default function App() {
     });
 
     try {
-      const registrosAtualizados = await updateOPMarcadoByOP(op, marcado, usuarioAtual);
+      const registrosAtualizados = await updateOPMarcadoByOP(op, marcado);
 
       if (Array.isArray(registrosAtualizados) && registrosAtualizados.length > 0) {
         const atualizadosPorId = new Map(
@@ -315,7 +304,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <Login onLoginSuccess={loadData} />;
+    return <Login onLoginSuccess={setSession} />;
   }
 
   return (
@@ -359,18 +348,6 @@ export default function App() {
       </header>
 
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8">
-        {!isSupabaseConfigured && (
-          <div role="alert" className="mb-5 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-amber-100">
-            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" aria-hidden="true" />
-            <div>
-              <h2 className="font-semibold">Supabase não configurado</h2>
-              <p className="mt-1 text-sm leading-6 text-amber-100/80">
-                Configure as variáveis <code className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-xs">VITE_SUPABASE_URL</code> e <code className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-xs">VITE_SUPABASE_ANON_KEY</code> no seu painel para conectar ao banco de dados.
-              </p>
-            </div>
-          </div>
-        )}
-
         {loadError && (
           <div role="alert" className="mb-5 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-red-100">
             <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-danger" aria-hidden="true" />
