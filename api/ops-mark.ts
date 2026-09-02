@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from './_lib/vercel-types';
-import { getSessionEmail } from './_lib/auth';
-import { getDb } from './_lib/db';
-import { normalizeDbRecord } from './_lib/ops';
+import type { VercelRequest, VercelResponse } from './_lib/vercel-types.js';
+import { getSessionEmail } from './_lib/auth.js';
+import { getDb } from './_lib/db.js';
+import { normalizeDbRecord } from './_lib/ops.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

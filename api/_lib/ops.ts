@@ -1,4 +1,4 @@
-import type { OPRecord, OPStatus } from '../../src/types';
+import type { OPRecord, OPStatus } from '../../src/types.js';
 
 export function statusLegadoEhMarcado(status?: OPStatus | null): boolean {
   return status === 'impresso' || status === 'recolhido';

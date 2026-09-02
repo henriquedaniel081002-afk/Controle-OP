@@ -1,5 +1,5 @@
-import type { VercelRequest, VercelResponse } from './_lib/vercel-types';
-import { getSessionEmail } from './_lib/auth';
+import type { VercelRequest, VercelResponse } from './_lib/vercel-types.js';
+import { getSessionEmail } from './_lib/auth.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {

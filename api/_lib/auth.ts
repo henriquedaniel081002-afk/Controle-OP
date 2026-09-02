@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { VercelRequest } from './vercel-types';
+import type { VercelRequest } from './vercel-types.js';
 
 const COOKIE_NAME = 'controle_op_session';
 const SESSION_DURATION_SECONDS = 60 * 60 * 12;
